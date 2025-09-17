@@ -9,11 +9,13 @@ interface Agent {
 interface AgentSelectorProps {
   onAgentChange: (agentName: string) => void;
   currentAgent: string;
+  isSwitching?: boolean;
 }
 
 const AgentSelector: React.FC<AgentSelectorProps> = ({
   onAgentChange,
   currentAgent,
+  isSwitching = false,
 }) => {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -91,11 +93,12 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
             <button
               key={agent.name}
               onClick={() => onAgentChange(agent.name)}
+              disabled={isSwitching}
               className={`px-3 py-1.5 text-sm rounded-full transition-colors ${
                 currentAgent === agent.name
                   ? "bg-blue-500 text-white"
                   : "bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600"
-              }`}
+              } ${isSwitching ? "opacity-50 cursor-not-allowed" : ""}`}
               title={agent.description}
             >
               {agent.role}

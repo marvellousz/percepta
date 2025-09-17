@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import ChatMessage from "@/components/ChatMessage";
 import ChatInput from "@/components/ChatInput";
 import AgentSelector from "@/components/AgentSelector";
+import LoadingAnimation from "@/components/LoadingAnimation";
 
 type Message = {
   id: string;
@@ -30,6 +31,8 @@ export default function ChatPage() {
     }
     return "general-assistant";
   });
+  const [isSwitchingAgent, setIsSwitchingAgent] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -87,6 +90,11 @@ export default function ChatPage() {
             isUser: !!data.isUser
           },
         ]);
+        
+        // Clear generating state when we receive a response (not from user)
+        if (data.type === "message" && !data.isUser) {
+          setIsGenerating(false);
+        }
       }
     };
 
@@ -109,6 +117,9 @@ export default function ChatPage() {
   const sendMessage = async (content: string) => {
     if (!content.trim()) return;
 
+    // Set generating state
+    setIsGenerating(true);
+
     // Don't add message to local state immediately
     // Let the server broadcast it back to everyone including the sender
     
@@ -120,6 +131,7 @@ export default function ChatPage() {
           agent: currentAgent,
         })
       );
+      // For websocket, we'll clear generating state when we receive a response
     } else {
       // Otherwise use the REST API with the selected agent
       try {
@@ -162,25 +174,17 @@ export default function ChatPage() {
             timestamp: new Date(),
           },
         ]);
+      } finally {
+        setIsGenerating(false);
       }
     }
   };
   
   const handleAgentChange = async (agentName: string) => {
+    setIsSwitchingAgent(true);
     setCurrentAgent(agentName);
     // Save the selected agent to localStorage
     localStorage.setItem("selected_agent", agentName);
-    
-    // Notify the user about agent change
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        content: `Switching to ${agentName} agent...`,
-        sender: "system",
-        timestamp: new Date(),
-      },
-    ]);
     
     try {
       const response = await fetch("/api/handoff", {
@@ -214,6 +218,18 @@ export default function ChatPage() {
       ]);
     } catch (error) {
       console.error("Error in agent handoff:", error);
+      // Add error message
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          content: "Failed to switch agent. Please try again.",
+          sender: "system",
+          timestamp: new Date(),
+        },
+      ]);
+    } finally {
+      setIsSwitchingAgent(false);
     }
   };
 
@@ -268,13 +284,15 @@ export default function ChatPage() {
             isSystem={message.isSystem}
           />
         ))}
+        {isSwitchingAgent && <LoadingAnimation type="agent-switching" />}
+        {isGenerating && <LoadingAnimation type="generating" />}
         <div ref={messagesEndRef} />
       </div>
 
       {/* Agent Selector and Chat Input */}
       <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4">
-        <AgentSelector onAgentChange={handleAgentChange} currentAgent={currentAgent} />
-        <ChatInput onSendMessage={sendMessage} disabled={false} />
+        <AgentSelector onAgentChange={handleAgentChange} currentAgent={currentAgent} isSwitching={isSwitchingAgent} />
+        <ChatInput onSendMessage={sendMessage} disabled={isSwitchingAgent || isGenerating} />
       </div>
     </div>
   );

@@ -306,10 +306,10 @@ def get_context_for_user(username: str, limit: int = 10) -> str:
         
         return context
 
-async def generate_response(message: str, username: str, agent_name: str = "support-agent", context: Optional[str] = None) -> str:
+async def generate_response(message: str, username: str, agent_name: str = "general-assistant", context: Optional[str] = None) -> str:
     try:
         # Get agent profile
-        agent = AGENTS.get(agent_name, AGENTS["support-agent"])
+        agent = AGENTS.get(agent_name, AGENTS["general-assistant"])
         
         # Prepare the user message
         user_message = f"User: {message}"
