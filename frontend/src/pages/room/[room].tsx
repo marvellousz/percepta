@@ -16,7 +16,7 @@ export default function RoomPage() {
     if (router.isReady && !username) {
       router.replace('/');
     }
-  }, [router, username]);
+  }, [router.isReady, username, router]);
   
   // Show loading while router is not ready or redirecting
   if (!router.isReady || !username) {
@@ -29,7 +29,22 @@ export default function RoomPage() {
   
   // Ensure room is always DEMO_ROOM for security
   const safeRoom = DEMO_ROOM;
-  const safeUsername = Array.isArray(username) ? username[0] : username;
+  // Ensure username is a string
+  const safeUsername = typeof username === 'string' ? username : Array.isArray(username) ? username[0] : '';
+  
+  // Redirect if username is empty after processing
+  if (!safeUsername) {
+    // Use useEffect for client-side redirect to avoid hydration issues
+    useEffect(() => {
+      router.replace('/');
+    }, [router]);
+    
+    return (
+      <div className={styles.loading}>
+        <div className={styles.loadingText}>Redirecting...</div>
+      </div>
+    );
+  }
   
   return (
     <div className={styles.container}>
