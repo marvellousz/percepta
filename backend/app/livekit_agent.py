@@ -57,7 +57,7 @@ class LiveKitAgent:
             logger.info(f"Participant disconnected: {participant.identity}")
             
         @self.room.on("data_received")
-        async def on_data_received(data: bytes, participant: rtc.RemoteParticipant, kind: rtc.DataPacketKind):
+        def on_data_received(data: bytes, participant: rtc.RemoteParticipant, kind: rtc.DataPacketKind):
             if participant.identity == settings.AGENT_IDENTITY:
                 # Ignore messages from self to prevent loops
                 return
@@ -69,7 +69,8 @@ class LiveKitAgent:
                 
                 # Check if it's a chat message
                 if message_data.get("type") == "chat":
-                    await self._handle_chat_message(message_data, participant.identity)
+                    # Create a task to handle the message asynchronously
+                    asyncio.create_task(self._handle_chat_message(message_data, participant.identity))
             except Exception as e:
                 logger.error(f"Error handling message: {e}")
                 
