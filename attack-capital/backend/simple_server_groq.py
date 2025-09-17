@@ -50,8 +50,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Store active connections
+# Store active connections by user and by room
 active_connections: Dict[str, WebSocket] = {}
+# Store room memberships - users in each room
+room_members: Dict[str, List[str]] = {}
 
 # Initialize SQLite database for legacy support
 def init_db():
@@ -461,14 +463,58 @@ async def handoff_conversation(request: HandoffRequest):
             "error": str(e)
         }
 
+async def broadcast_to_room(room_name: str, message: dict, exclude_user: Optional[str] = None):
+    """Broadcast a message to all users in a room"""
+    if room_name in room_members:
+        for username in room_members[room_name]:
+            # Skip the excluded user (usually the sender)
+            if exclude_user and username == exclude_user:
+                continue
+            
+            # Make a copy of the message for this specific recipient
+            user_specific_message = message.copy()
+            
+            # Always include isUser flag, whether it's a user message, AI message, or system message
+            if "username" in message:
+                # For user messages: set isUser=true only if this user is the sender
+                if message.get("sender") == "user":
+                    user_specific_message["isUser"] = (username == message["username"])
+                # For AI messages: set isUser=false for everyone
+                else:
+                    user_specific_message["isUser"] = False
+            # For system messages with no username
+            else:
+                user_specific_message["isUser"] = False
+                
+            # Send to this room member if they're connected
+            if username in active_connections:
+                try:
+                    await active_connections[username].send_json(user_specific_message)
+                    logger.debug(f"Message broadcast to {username} in room {room_name}")
+                except Exception as e:
+                    logger.error(f"Error broadcasting to {username}: {str(e)}")
+
 @app.websocket("/ws/{username}/{room_name}")
 async def websocket_endpoint(websocket: WebSocket, username: str, room_name: str):
-    await websocket.accept()
-    active_connections[username] = websocket
-    
+    logger.debug(f"WebSocket connection attempt from {username} for room {room_name}")
     try:
+        await websocket.accept()
+        logger.debug(f"WebSocket connection accepted for {username}")
+        
+        # Store connection
+        active_connections[username] = websocket
+        
+        # Add user to room
+        if room_name not in room_members:
+            room_members[room_name] = []
+        if username not in room_members[room_name]:
+            room_members[room_name].append(username)
+            
+        logger.debug(f"Added {username} to room {room_name}. Room members: {room_members[room_name]}")
+        
         # Initialize user if they don't exist
         initialize_user(username)
+        logger.debug(f"User {username} initialized")
         
         # Check if this is a returning user
         user_messages = get_all_messages_for_user(username)
@@ -479,12 +525,25 @@ async def websocket_endpoint(websocket: WebSocket, username: str, room_name: str
             welcome_message = f"Hello {username}! Welcome back to Attack Capital Chat. How can I assist you today?"
         else:
             welcome_message = f"Hello {username}! Welcome to Attack Capital Chat. I'm your AI assistant. How can I help you today?"
+            
+        # Also broadcast that a new user has joined the room
+        join_message = {
+            "type": "system",
+            "content": f"{username} has joined the room.",
+            "sender": "system"
+        }
+        await broadcast_to_room(room_name, join_message, exclude_user=None)
         
-        await websocket.send_json({
+        # Create welcome message
+        welcome_message_obj = {
             "type": "message",
             "sender": "ai-assistant",
-            "content": welcome_message
-        })
+            "content": welcome_message,
+            "username": username  # Include the username of who this welcome is for
+        }
+        
+        # Broadcast welcome message to all users in the room
+        await broadcast_to_room(room_name, welcome_message_obj, exclude_user=None)
         
         # Add welcome message to memory
         add_message(username, welcome_message, False)
@@ -495,6 +554,16 @@ async def websocket_endpoint(websocket: WebSocket, username: str, room_name: str
             message = data.get("message", "")
             agent_name = data.get("agent", "support-agent")
             
+            # Broadcast user's message to everyone in the room including the sender
+            user_message_obj = {
+                "type": "message",
+                "sender": "user",
+                "content": message,
+                "username": username
+            }
+            # Don't exclude the sender - everyone should see the message
+            await broadcast_to_room(room_name, user_message_obj, exclude_user=None)
+            
             # Store the message in memory
             add_message(username, message, True)
             
@@ -504,21 +573,47 @@ async def websocket_endpoint(websocket: WebSocket, username: str, room_name: str
             # Store the AI response in memory
             add_message(username, response, False)
             
-            # Send response back to user
-            await websocket.send_json({
+            # Prepare message object
+            response_message = {
                 "type": "message",
                 "sender": "ai-assistant",
-                "content": response
-            })
+                "content": response,
+                "username": username  # Include sender's username
+            }
+            
+            # Send response to all users in the room (including the sender)
+            await broadcast_to_room(room_name, response_message, exclude_user=None)
             
     except WebSocketDisconnect:
         logger.info(f"User {username} disconnected from room {room_name}")
+        # Remove from active connections
         if username in active_connections:
             del active_connections[username]
+        
+        # Remove from room
+        if room_name in room_members and username in room_members[room_name]:
+            room_members[room_name].remove(username)
+            logger.debug(f"Removed {username} from room {room_name}")
+            
+            # Notify other users in the room that this user left
+            leave_message = {
+                "type": "system",
+                "content": f"{username} has left the room.",
+                "sender": "system"
+            }
+            await broadcast_to_room(room_name, leave_message)
+            
     except Exception as e:
-        logger.error(f"Error in websocket connection: {str(e)}")
+        logger.error(f"Error in websocket connection for {username} in room {room_name}: {str(e)}")
+        logger.error(f"Error type: {type(e)}")
+        import traceback
+        logger.error(f"Stack trace: {traceback.format_exc()}")
+        
+        # Clean up connections
         if username in active_connections:
             del active_connections[username]
+        if room_name in room_members and username in room_members[room_name]:
+            room_members[room_name].remove(username)
 
 if __name__ == "__main__":
     # Ensure the data directory exists

@@ -11,6 +11,9 @@ type Message = {
   content: string;
   sender: string;
   timestamp: Date;
+  username?: string; // To identify which user sent the message
+  isSystem?: boolean; // For system messages like "user joined"
+  isUser?: boolean;   // Flag to indicate if this message is from the current user
 };
 
 export default function ChatPage() {
@@ -48,8 +51,10 @@ export default function ChatPage() {
     setRoomName(storedRoomName);
 
     // Connect to WebSocket
+    const backendWsUrl = process.env.NEXT_PUBLIC_BACKEND_WS_URL || 'ws://localhost:8000';
+    console.log(`Connecting to WebSocket at ${backendWsUrl}/ws/${storedUsername}/${storedRoomName}`);
     const ws = new WebSocket(
-      `ws://localhost:8000/ws/${storedUsername}/${storedRoomName}`
+      `${backendWsUrl}/ws/${storedUsername}/${storedRoomName}`
     );
 
     ws.onopen = () => {
@@ -65,7 +70,9 @@ export default function ChatPage() {
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      if (data.type === "message") {
+      console.log("Received WebSocket message:", data);
+      
+      if (data.type === "message" || data.type === "system") {
         setMessages((prev) => [
           ...prev,
           {
@@ -73,6 +80,10 @@ export default function ChatPage() {
             content: data.content,
             sender: data.sender,
             timestamp: new Date(),
+            username: data.username,
+            isSystem: data.type === "system",
+            // Server now sends isUser flag to tell if this is the current user's message
+            isUser: !!data.isUser
           },
         ]);
       }
@@ -97,15 +108,9 @@ export default function ChatPage() {
   const sendMessage = async (content: string) => {
     if (!content.trim()) return;
 
-    // Add message to local state
-    const newMessage = {
-      id: Date.now().toString(),
-      content,
-      sender: username,
-      timestamp: new Date(),
-    };
-    setMessages((prev) => [...prev, newMessage]);
-
+    // Don't add message to local state immediately
+    // Let the server broadcast it back to everyone including the sender
+    
     // If websocket is open, send message through it
     if (websocket && websocket.readyState === WebSocket.OPEN) {
       websocket.send(
@@ -256,8 +261,10 @@ export default function ChatPage() {
           <ChatMessage
             key={message.id}
             message={message.content}
-            isUser={message.sender === username}
+            isUser={!!message.isUser}
             sender={message.sender}
+            username={message.username}
+            isSystem={message.isSystem}
           />
         ))}
         <div ref={messagesEndRef} />

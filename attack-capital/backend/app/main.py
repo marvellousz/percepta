@@ -18,6 +18,7 @@ from .livekit_integration.agent import LiveKitAgent
 from .memory.memory_store import MemoryStore
 from .llm.gemini_client import GeminiClient
 from .multi_agent.agent_manager import AgentManager
+from .api import router as api_router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -33,6 +34,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include API routes
+app.include_router(api_router, prefix="/api")
 
 # Initialize components
 memory_store = MemoryStore()
