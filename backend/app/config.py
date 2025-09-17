@@ -1,6 +1,6 @@
 # backend/app/config.py
 import os
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     LIVEKIT_API_KEY: str
@@ -14,6 +14,6 @@ class Settings(BaseSettings):
     AGENT_IDENTITY: str = "MemoryBot"
 
     class Config:
-        env_file = ".env"
+        env_file = "../.env"
 
 settings = Settings()
