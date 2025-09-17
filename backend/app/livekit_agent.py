@@ -8,6 +8,7 @@ import time
 from livekit import rtc
 from livekit import api
 from .config import settings
+from .utils import async_retry, RateLimiter
 
 logger = logging.getLogger(__name__)
 
@@ -15,8 +16,7 @@ class LiveKitAgent:
     def __init__(self):
         self.room = rtc.Room()
         self.connected = False
-        self.last_response_ts_by_user: Dict[str, float] = {}  # For rate limiting
-        self.rate_limit_seconds = 1.5  # Minimum seconds between responses to the same user
+        self.rate_limiter = RateLimiter(rate_limit_seconds=1.5)  # Rate limiter for user responses
         
     async def connect(self):
         """Connect to the LiveKit room as the agent"""
@@ -77,15 +77,12 @@ class LiveKitAgent:
     async def _handle_chat_message(self, message_data: Dict[str, Any], sender_identity: str):
         """Handle a chat message from a participant"""
         # Check rate limiting for this user
-        current_time = time.time()
-        last_response_time = self.last_response_ts_by_user.get(sender_identity, 0)
-        
-        if current_time - last_response_time < self.rate_limit_seconds:
+        if self.rate_limiter.is_rate_limited(sender_identity):
             logger.info(f"Rate limiting message from {sender_identity}")
             return
             
         # Update last response time
-        self.last_response_ts_by_user[sender_identity] = current_time
+        self.rate_limiter.update_last_operation_time(sender_identity)
         
         # Extract the text from the message
         text = message_data.get("text", "")
@@ -94,14 +91,75 @@ class LiveKitAgent:
             
         logger.info(f"Received message from {sender_identity}: {text}")
         
-        # TODO: In Task 3-5, we'll add:
-        # 1. Memory retrieval from mem0_client
-        # 2. Prompt building with prompt_builder
-        # 3. Response generation with gemini_client
-        
-        # For now, just send a simple acknowledgment
-        response = f"Received your message: {text}"
-        await self._send_chat_message(response)
+        try:
+            # Step 1: Retrieve memories for this user
+            from . import mem0_client
+            memories = []
+            
+            @async_retry(retries=2, delay=0.5, backoff=2.0)
+            async def retrieve_memories():
+                return await mem0_client.query_memory(
+                    username=sender_identity, 
+                    query_text=text,
+                    top_k=5
+                )
+                
+            try:
+                memories = await retrieve_memories()
+                logger.info(f"Retrieved {len(memories)} memories for user {sender_identity}")
+            except Exception as e:
+                logger.error(f"Error retrieving memories after retries: {e}")
+                # Continue with empty memories if retrieval fails
+            
+            # Step 2: Build prompt with memories and user message
+            from . import prompt_builder
+            prompt = prompt_builder.build_prompt(
+                retrieved_memories=memories,
+                user_message=text
+            )
+            
+            # Step 3: Generate response with Gemini
+            from . import gemini_client
+            
+            @async_retry(retries=2, delay=1.0, backoff=2.0)
+            async def generate_ai_response():
+                return await gemini_client.generate_response(prompt)
+                
+            response = await generate_ai_response()
+            
+            # Step 4: Send the response back to the user
+            await self._send_chat_message(response)
+            
+            # Step 5: Index the conversation in memory
+            @async_retry(retries=2, delay=0.5, backoff=2.0)
+            async def index_conversation():
+                # Index user message
+                await mem0_client.index_memory(
+                    username=sender_identity,
+                    text=text,
+                    role="user"
+                )
+                
+                # Index agent response
+                await mem0_client.index_memory(
+                    username=sender_identity,
+                    text=response,
+                    role="agent"
+                )
+            
+            try:
+                await index_conversation()
+                logger.info(f"Indexed conversation for user {sender_identity}")
+            except Exception as e:
+                logger.error(f"Error indexing conversation after retries: {e}")
+                # Continue even if indexing fails
+                
+        except Exception as e:
+            logger.error(f"Error handling message: {e}")
+            # Send a fallback response in case of any error
+            await self._send_chat_message(
+                "I apologize, but I encountered an error while processing your message. Please try again."
+            )
         
     async def _send_chat_message(self, text: str):
         """Send a chat message to the room"""
