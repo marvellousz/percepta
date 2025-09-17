@@ -5,7 +5,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Attack Capital AI Chat",
+  title: "Percepta AI Chat",
   description: "Real-time AI chat with memory persistence and multi-agent capabilities",
 };
 

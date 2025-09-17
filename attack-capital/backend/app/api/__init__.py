@@ -1,5 +1,5 @@
 """
-API Router package for the Attack Capital backend
+API Router package for the Percepta backend
 """
 from fastapi import APIRouter
 

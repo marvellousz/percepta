@@ -16,4 +16,4 @@ RUN mkdir -p data
 EXPOSE 8000
 
 # Run the application
-CMD ["python", "simple_server.py"]
+CMD ["python", "simple_server_groq.py"]

@@ -24,11 +24,6 @@ logger = logging.getLogger(__name__)
 groq_api_key = os.getenv("GROQ_API_KEY")
 if not groq_api_key:
     raise ValueError("GROQ_API_KEY environment variable not set")
-print(f"DEBUG: GROQ_API_KEY (first 6 chars): {groq_api_key[:6]}...")  # Debug print
-# Check for path environment variable
-print(f"DEBUG: Current working directory: {os.getcwd()}")
-print(f"DEBUG: .env file exists in current dir: {os.path.exists('.env')}")
-print(f"DEBUG: .env file exists in parent dir: {os.path.exists('../.env')}")
 
 # Initialize ChatGroq LLM
 groq_chat_model = ChatGroq(
@@ -46,7 +41,7 @@ mem0_client = MemoryClient(api_key=mem0_api_key)
 logger.info("Mem0 client initialized")
 
 # Initialize FastAPI
-app = FastAPI(title="Attack Capital AI Chat (LangChain-Groq)")
+app = FastAPI(title="Percepta AI Chat (LangChain-Groq)")
 
 # Configure CORS
 app.add_middleware(
@@ -383,7 +378,7 @@ async def generate_response(message: str, username: str, agent_name: str = "gene
 
 @app.get("/")
 async def root():
-    return {"message": "Attack Capital AI Chat Backend (LangChain-Groq)"}
+    return {"message": "Percepta AI Chat Backend (LangChain-Groq)"}
 
 @app.get("/agents")
 async def list_agents():
@@ -490,9 +485,9 @@ async def websocket_endpoint(websocket: WebSocket, username: str, room_name: str
         
         # Use a simple welcome message that doesn't reference previous conversations
         if is_returning_user:
-            welcome_message = f"Hello {username}! Welcome back to Attack Capital Chat. How can I assist you today?"
+            welcome_message = f"Hello {username}! Welcome back to Percepta Chat. How can I assist you today?"
         else:
-            welcome_message = f"Hello {username}! Welcome to Attack Capital Chat. I'm your AI assistant. How can I help you today?"
+            welcome_message = f"Hello {username}! Welcome to Percepta Chat. I'm your AI assistant. How can I help you today?"
         
         await websocket.send_json({
             "type": "message",

@@ -24,7 +24,7 @@ from .api import router as api_router
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Attack Capital AI Chat")
+app = FastAPI(title="Percepta AI Chat")
 
 # Configure CORS
 app.add_middleware(
@@ -63,7 +63,7 @@ class HandoffRequest(BaseModel):
 
 @app.get("/")
 async def root():
-    return {"message": "Attack Capital AI Chat Backend"}
+    return {"message": "Percepta AI Chat Backend"}
 
 @app.get("/agents")
 async def list_agents():

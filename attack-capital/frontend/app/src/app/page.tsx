@@ -50,7 +50,7 @@ export default function Home() {
       <div className="w-full max-w-md p-8 space-y-8 bg-white dark:bg-gray-800 rounded-xl shadow-lg">
         <div className="text-center">
           <h1 className="text-4xl font-bold text-gray-900 dark:text-white">
-            Attack Capital
+            Percepta
           </h1>
           <p className="mt-2 text-gray-600 dark:text-gray-300">
             AI-Powered Chat with Memory

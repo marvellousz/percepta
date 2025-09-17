@@ -33,8 +33,6 @@ class GeminiClient:
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
             raise ValueError("GEMINI_API_KEY environment variable not set")
-        # Debug: Print partial API key to verify it's loaded correctly
-        print(f"DEBUG GEMINI_API_KEY (first 6 chars): {api_key[:6]}...")
 
         genai.configure(api_key=api_key)
         self.model_name = model_name
@@ -124,7 +122,7 @@ class GeminiClient:
 
     def _create_prompt(self, message: str, username: str, context: Optional[str]) -> str:
         base = f"""
-        You are an AI assistant in a chat application for Attack Capital.
+        You are an AI assistant in a chat application for Percepta.
         Your goal is to be helpful, friendly, and personalized in your responses.
 
         Username: {username}

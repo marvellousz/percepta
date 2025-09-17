@@ -38,7 +38,6 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
         }
         
         const data = await response.json();
-        console.log("Agents fetched:", data.agents);
         setAgents(data.agents || []);
         setError(null);
       } catch (err) {

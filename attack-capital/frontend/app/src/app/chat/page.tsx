@@ -56,13 +56,11 @@ export default function ChatPage() {
 
     // Connect to WebSocket
     const backendWsUrl = process.env.NEXT_PUBLIC_BACKEND_WS_URL || 'ws://localhost:8000';
-    console.log(`Connecting to WebSocket at ${backendWsUrl}/ws/${storedUsername}/${storedRoomName}`);
     const ws = new WebSocket(
       `${backendWsUrl}/ws/${storedUsername}/${storedRoomName}`
     );
 
     ws.onopen = () => {
-      console.log("Connected to WebSocket");
       setIsConnected(true);
       
       // Make sure we're using the current agent
@@ -74,7 +72,6 @@ export default function ChatPage() {
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      console.log("Received WebSocket message:", data);
       
       if (data.type === "message" || data.type === "system") {
         setMessages((prev) => [
@@ -99,7 +96,6 @@ export default function ChatPage() {
     };
 
     ws.onclose = () => {
-      console.log("Disconnected from WebSocket");
       setIsConnected(false);
     };
 
@@ -250,7 +246,7 @@ export default function ChatPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div>
             <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
-              Attack Capital Chat
+              Percepta Chat
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Room: {roomName} | User: {username}

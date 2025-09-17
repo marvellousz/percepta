@@ -24,11 +24,6 @@ logger = logging.getLogger(__name__)
 groq_api_key = os.getenv("GROQ_API_KEY")
 if not groq_api_key:
     raise ValueError("GROQ_API_KEY environment variable not set")
-print(f"DEBUG: GROQ_API_KEY (first 6 chars): {groq_api_key[:6]}...")  # Debug print
-# Check for path environment variable
-print(f"DEBUG: Current working directory: {os.getcwd()}")
-print(f"DEBUG: .env file exists in current dir: {os.path.exists('.env')}")
-print(f"DEBUG: .env file exists in parent dir: {os.path.exists('../.env')}")
 groq_client = Groq(api_key=groq_api_key)
 
 # Initialize Mem0 client
@@ -39,7 +34,7 @@ mem0_client = MemoryClient(api_key=mem0_api_key)
 logger.info("Mem0 client initialized")
 
 # Initialize FastAPI
-app = FastAPI(title="Attack Capital AI Chat")
+app = FastAPI(title="Percepta AI Chat")
 
 # Configure CORS
 app.add_middleware(
@@ -196,13 +191,15 @@ def add_message(username: str, message: str, is_user: bool):
         messages = [{"role": role, "content": message}]
         
         # Add to Mem0 with proper parameters
+        # Use store_raw=True to prevent automatic summarization
         mem0_client.add(
             messages=messages,
             user_id=username,
-            version="v2"  # Using v2 API as recommended
+            version="v2",  # Using v2 API as recommended
+            store_raw=True  # Store raw messages without summarization
         )
         
-        logger.info(f"Message added to Mem0 for user {username}")
+        logger.info(f"Message added to Mem0 for user {username}: {role} - {message[:50]}...")
     except Exception as e:
         logger.error(f"Error adding message to Mem0: {str(e)}")
         # Fall back to SQLite
@@ -263,6 +260,7 @@ def get_context_for_user(username: str, limit: int = 10) -> str:
             limit=limit
         )
         
+        
         # Format the context
         context = ""
         if results:
@@ -282,8 +280,22 @@ def get_context_for_user(username: str, limit: int = 10) -> str:
                         else:
                             context += f"{memory_content}\n"
                     except:
-                        # If parsing fails, just use the raw memory
-                        context += f"{memory_content}\n"
+                        # If parsing fails, check if it's a raw message format
+                        if "User:" in memory_content or "Assistant:" in memory_content:
+                            context += f"{memory_content}\n"
+                        else:
+                            # Try to infer role from content
+                            if "user" in memory_content.lower() and "likes" in memory_content.lower():
+                                context += f"User: {memory_content}\n"
+                            else:
+                                context += f"Assistant: {memory_content}\n"
+                else:
+                    # Handle case where memory is directly in the item
+                    if isinstance(item, dict) and "content" in item:
+                        content = item.get("content", "")
+                        role = item.get("role", "assistant")
+                        speaker = "User" if role == "user" else "Assistant"
+                        context += f"{speaker}: {content}\n"
         
         return context
     except Exception as e:
@@ -320,46 +332,52 @@ async def generate_response(message: str, username: str, agent_name: str = "gene
             {"role": "system", "content": agent['prompt']}
         ]
         
-        # Only add context if explicitly needed
-        # This is where we'd use the context flag if we wanted to control it
-        use_context = True  # You can make this a parameter or dynamic based on needs
-        
-        if use_context:
-            try:
-                # Get memories for this user to build conversation history
-                filters = {"user_id": username}
-                recent_messages = mem0_client.search(
-                    query="recent conversation",
-                    version="v2",
-                    filters=filters,
-                    limit=10  # Limit to recent messages
-                )
-                
-                # Format messages for Groq
-                if recent_messages:
-                    for item in recent_messages:
-                        # Extract memory content
-                        if isinstance(item, dict) and "memory" in item:
-                            memory_content = item["memory"]
-                            
-                            # Try to parse the memory
-                            try:
-                                memory_data = json.loads(memory_content)
-                                if isinstance(memory_data, dict):
-                                    role = memory_data.get("role", "")
-                                    content = memory_data.get("content", "")
-                                    
-                                    # Only add valid roles (user or assistant)
-                                    if role in ["user", "assistant"] and content:
-                                        messages.append({"role": role, "content": content})
-                            except:
-                                # Skip invalid memories
-                                pass
-            except Exception as mem_err:
-                logger.warning(f"Error retrieving memory context: {str(mem_err)}")
+        # Get conversation context from memory
+        try:
+            # Get memories for this user to build conversation history
+            filters = {"user_id": username}
+            recent_messages = mem0_client.search(
+                query="recent conversation",
+                version="v2",
+                filters=filters,
+                limit=8  # Limit to recent messages to avoid token limits
+            )
+            
+            
+            # Format messages for Groq
+            if recent_messages:
+                for item in recent_messages:
+                    # Extract memory content
+                    if isinstance(item, dict) and "memory" in item:
+                        memory_content = item["memory"]
+                        
+                        # Try to parse the memory
+                        try:
+                            memory_data = json.loads(memory_content)
+                            if isinstance(memory_data, dict):
+                                role = memory_data.get("role", "")
+                                content = memory_data.get("content", "")
+                                
+                                # Only add valid roles (user or assistant) and non-empty content
+                                if role in ["user", "assistant"] and content and content.strip():
+                                    messages.append({"role": role, "content": content.strip()})
+                        except:
+                            # Skip invalid memories
+                            pass
+                    else:
+                        # Handle direct content format
+                        if isinstance(item, dict) and "content" in item:
+                            content = item.get("content", "")
+                            role = item.get("role", "assistant")
+                            if role in ["user", "assistant"] and content and content.strip():
+                                messages.append({"role": role, "content": content.strip()})
+        except Exception as mem_err:
+            logger.warning(f"Error retrieving memory context: {str(mem_err)}")
+            # Continue without context rather than failing
         
         # Always add the current message at the end
         messages.append({"role": "user", "content": message})
+        
         
         # Generate response using Groq
         # Using llama-3.1-8b-instant model for faster responses
@@ -383,7 +401,7 @@ async def generate_response(message: str, username: str, agent_name: str = "gene
 
 @app.get("/")
 async def root():
-    return {"message": "Attack Capital AI Chat Backend"}
+    return {"message": "Percepta AI Chat Backend"}
 
 @app.get("/agents")
 async def list_agents():
@@ -453,16 +471,37 @@ async def handoff_conversation(request: HandoffRequest):
         agent = AGENTS.get(to_agent, AGENTS["general-assistant"])
         logger.info(f"Agent found: {agent}")
         
-        # Generate simple handoff message
-        handoff_message = f"I'm now switching to {agent['role']} mode to better assist you."
-        logger.info(f"Handoff message: {handoff_message}")
+        # Get conversation context from memory
+        context = get_context_for_user(username, limit=15)
+        
+        # Generate contextual handoff message using the new agent
+        handoff_prompt = f"""
+        {agent['prompt']}
+        
+        Previous conversation context:
+        {context}
+        
+        You are now taking over this conversation as {agent['role']}. 
+        Generate a brief welcome message that acknowledges you're taking over and shows you understand the conversation context.
+        Be helpful and continue the conversation naturally.
+        Keep it concise and friendly.
+        """
+        
+        # Generate contextual handoff message
+        handoff_response = await generate_response(
+            message=handoff_prompt, 
+            username=username, 
+            agent_name=to_agent,
+            context=None  # Don't add extra context since we already have it in the prompt
+        )
+        
         
         # Store the handoff message
-        add_message(username, handoff_message, False)
+        add_message(username, handoff_response, False)
         
         return {
             "success": True, 
-            "message": handoff_message,
+            "message": handoff_response,
             "from_agent": from_agent,
             "to_agent": to_agent
         }
@@ -502,16 +541,13 @@ async def broadcast_to_room(room_name: str, message: dict, exclude_user: Optiona
             if username in active_connections:
                 try:
                     await active_connections[username].send_json(user_specific_message)
-                    logger.debug(f"Message broadcast to {username} in room {room_name}")
                 except Exception as e:
                     logger.error(f"Error broadcasting to {username}: {str(e)}")
 
 @app.websocket("/ws/{username}/{room_name}")
 async def websocket_endpoint(websocket: WebSocket, username: str, room_name: str):
-    logger.debug(f"WebSocket connection attempt from {username} for room {room_name}")
     try:
         await websocket.accept()
-        logger.debug(f"WebSocket connection accepted for {username}")
         
         # Store connection
         active_connections[username] = websocket
@@ -522,11 +558,9 @@ async def websocket_endpoint(websocket: WebSocket, username: str, room_name: str
         if username not in room_members[room_name]:
             room_members[room_name].append(username)
             
-        logger.debug(f"Added {username} to room {room_name}. Room members: {room_members[room_name]}")
         
         # Initialize user if they don't exist
         initialize_user(username)
-        logger.debug(f"User {username} initialized")
         
         # Check if this is a returning user
         user_messages = get_all_messages_for_user(username)
@@ -534,9 +568,9 @@ async def websocket_endpoint(websocket: WebSocket, username: str, room_name: str
         
         # Use a simple welcome message that doesn't reference previous conversations
         if is_returning_user:
-            welcome_message = f"Hello {username}! Welcome back to Attack Capital Chat. How can I assist you today?"
+            welcome_message = f"Hello {username}! Welcome back to Percepta Chat. How can I assist you today?"
         else:
-            welcome_message = f"Hello {username}! Welcome to Attack Capital Chat. I'm your AI assistant. How can I help you today?"
+            welcome_message = f"Hello {username}! Welcome to Percepta Chat. I'm your AI assistant. How can I help you today?"
             
         # Also broadcast that a new user has joined the room
         join_message = {
@@ -605,7 +639,6 @@ async def websocket_endpoint(websocket: WebSocket, username: str, room_name: str
         # Remove from room
         if room_name in room_members and username in room_members[room_name]:
             room_members[room_name].remove(username)
-            logger.debug(f"Removed {username} from room {room_name}")
             
             # Notify other users in the room that this user left
             leave_message = {
