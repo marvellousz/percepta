@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+python-dotenv
+pydantic[dotenv]
+livekit>=0.12.33     # client SDK (participant)
+livekit-api          # server SDK (token generation)
+mem0ai>=0.1.117      # mem0 python SDK (optional, fallback provided)
+google-genai>=0.8.5  # Google Gen AI (Gemini) python SDK
+aiohttp
+python-jose[cryptography]  # for JWT tokens
+
+# For fallback memory implementation
+sentence-transformers  # for embeddings (fallback memory)
+faiss-cpu              # for vector search (fallback memory, optional)
+numpy                  # required for embeddings and vector operations

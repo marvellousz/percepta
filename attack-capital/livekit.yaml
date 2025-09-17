@@ -1,0 +1,10 @@
+port: 7880
+rtc:
+  port_range:
+    start: 50000
+    end: 60000
+  use_external_ip: true
+keys:
+  devkey: devsecret
+logging:
+  level: info

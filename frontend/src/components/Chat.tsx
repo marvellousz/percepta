@@ -126,7 +126,17 @@ const Chat: React.FC<ChatProps> = ({ username, roomName }) => {
   }
   
   if (error) {
-    return <div className={styles.error}>Error: {error}</div>;
+    return (
+      <div className={styles.error}>
+        <p>Error: {error}</p>
+        <button 
+          className={styles.retryButton}
+          onClick={() => window.location.reload()}
+        >
+          Retry Connection
+        </button>
+      </div>
+    );
   }
   
   return (

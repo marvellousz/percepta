@@ -1,12 +1,14 @@
 # backend/app/main.py
 import asyncio
 import logging
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import contextlib
 from .config import settings
 from .token_endpoint import router as token_router
 from . import livekit_agent
+from .memory_store import get_memory_store
 
 # Configure logging
 logging.basicConfig(
@@ -48,8 +50,18 @@ def root():
 
 @app.on_event("startup")
 async def startup_event():
-    """Start the LiveKit agent when the application starts"""
+    """Start the LiveKit agent and initialize memory store when the application starts"""
     global agent_task
+    
+    # Initialize memory store if it exists
+    memory_store = get_memory_store()
+    memory_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "memory_store.pkl")
+    if os.path.exists(memory_file_path):
+        try:
+            memory_store.load_from_file(memory_file_path)
+            logger.info(f"Memory store loaded from {memory_file_path}")
+        except Exception as e:
+            logger.error(f"Failed to load memory store: {e}")
     
     # Create a background task to initialize and run the agent
     try:
@@ -61,7 +73,17 @@ async def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Disconnect the LiveKit agent when the application shuts down"""
+    """Disconnect the LiveKit agent and save memory store when the application shuts down"""
+    # Save memory store
+    try:
+        memory_store = get_memory_store()
+        memory_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "memory_store.pkl")
+        memory_store.save_to_file(memory_file_path)
+        logger.info(f"Memory store saved to {memory_file_path}")
+    except Exception as e:
+        logger.error(f"Failed to save memory store: {e}")
+    
+    # Disconnect LiveKit agent
     if livekit_agent.agent and livekit_agent.agent.connected:
         with contextlib.suppress(Exception):
             await livekit_agent.agent.room.disconnect()

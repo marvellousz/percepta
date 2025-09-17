@@ -1,15 +1,37 @@
 # backend/app/gemini_client.py
 import logging
-import google.generativeai as genai
-from typing import List, Optional, Dict, Any
+import os
 import asyncio
+from typing import List, Optional, Dict, Any
 
 from .config import settings
 
 logger = logging.getLogger(__name__)
 
+# Try to import google.generativeai if it's available
+try:
+    import google.generativeai as genai
+    GEMINI_AVAILABLE = True
+except ImportError:
+    logger.warning("google.generativeai module not available")
+    GEMINI_AVAILABLE = False
+
 # Configure the Gemini API
-genai.configure(api_key=settings.GEMINI_API_KEY)
+try:
+    if not settings.GEMINI_API_KEY:
+        logger.error("GEMINI_API_KEY is not set in environment variables")
+        raise ValueError("GEMINI_API_KEY is not set")
+    
+    if GEMINI_AVAILABLE:
+        if settings.GEMINI_API_KEY == "dummy_gemini_api_key":
+            logger.warning("Using dummy Gemini API key - will return mock responses")
+        else:
+            genai.configure(api_key=settings.GEMINI_API_KEY)
+            logger.info("Gemini API configured successfully")
+    else:
+        logger.warning("Skipping Gemini API configuration as the module is not available")
+except Exception as e:
+    logger.error(f"Failed to configure Gemini API: {e}")
 
 async def embed_text(text: str) -> List[float]:
     """
@@ -21,13 +43,32 @@ async def embed_text(text: str) -> List[float]:
     Returns:
         List[float]: The embedding vector
     """
+    # Check if using dummy key or Gemini is not available
+    if not GEMINI_AVAILABLE or settings.GEMINI_API_KEY == "dummy_gemini_api_key":
+        logger.warning("Using mock embeddings")
+        import hashlib
+        import struct
+        
+        # Generate a deterministic but unique embedding for each text
+        hash_obj = hashlib.md5(text.encode())
+        hash_bytes = hash_obj.digest()
+        
+        # Convert to floats - repeat the hash to get to 768 dimensions
+        floats = []
+        for i in range(96):  # 96 * 8 = 768
+            idx = i % 16  # 16 bytes in MD5 hash
+            val = struct.unpack('d', hash_bytes[idx:idx+1] * 8)[0]
+            floats.append(val)
+            
+        return floats
+        
     try:
         # Use a thread pool to run the synchronous embedding API call
         loop = asyncio.get_event_loop()
         embedding_result = await loop.run_in_executor(
             None, 
             lambda: genai.embed_content(
-                model="models/embedding-001",
+                model="models/embedding-002",  # Using the latest embedding model
                 content=text,
                 task_type="semantic_similarity",
             )
@@ -52,6 +93,12 @@ async def generate_response(prompt: str) -> str:
     Returns:
         str: The generated response
     """
+    # Check if using dummy key or Gemini is not available
+    if not GEMINI_AVAILABLE or settings.GEMINI_API_KEY == "dummy_gemini_api_key":
+        logger.warning("Using mock response generator")
+        await asyncio.sleep(1)  # Simulate API latency
+        return "Hello! I'm MemoryBot running in development mode. Since you're using a dummy API key, I'm providing a mock response. I would normally use Google's Gemini API to generate a proper response to your query."
+        
     try:
         # Configure the generation model
         generation_config = {
@@ -80,12 +127,24 @@ async def generate_response(prompt: str) -> str:
             }
         ]
         
-        # Initialize the model
-        model = genai.GenerativeModel(
-            model_name="gemini-1.5-pro",
-            generation_config=generation_config,
-            safety_settings=safety_settings
-        )
+        # Initialize the model - use the latest available model
+        try:
+            # Try Gemini 2.5 Pro first (newer, better model)
+            model = genai.GenerativeModel(
+                model_name="gemini-2.5-pro",
+                generation_config=generation_config,
+                safety_settings=safety_settings
+            )
+            logger.info("Using Gemini 2.5 Pro model")
+        except Exception as e:
+            logger.warning(f"Failed to initialize Gemini 2.5 Pro, falling back to 1.5 Pro: {e}")
+            # Fall back to Gemini 1.5 Pro
+            model = genai.GenerativeModel(
+                model_name="gemini-1.5-pro",
+                generation_config=generation_config,
+                safety_settings=safety_settings
+            )
+            logger.info("Using Gemini 1.5 Pro model")
         
         # Use a thread pool to run the synchronous API call
         loop = asyncio.get_event_loop()

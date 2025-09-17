@@ -14,7 +14,16 @@ logger = logging.getLogger(__name__)
 class Mem0Client:
     def __init__(self):
         """Initialize the mem0 client with API key from settings"""
-        self.client = mem0ai.Mem0Client(api_key=settings.MEM0_API_KEY)
+        try:
+            if not settings.MEM0_API_KEY:
+                logger.error("MEM0_API_KEY is not set in environment variables")
+                raise ValueError("MEM0_API_KEY is not set")
+                
+            self.client = mem0ai.Mem0Client(api_key=settings.MEM0_API_KEY)
+            logger.info("mem0 client initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize mem0 client: {e}")
+            raise
         
     async def index_memory(self, username: str, text: str, role: str = "user") -> bool:
         """
@@ -39,12 +48,15 @@ class Mem0Client:
                 "timestamp": time.time(),
             }
             
-            # Index the memory in mem0
-            await self.client.index(
-                embedding=embedding,
-                text=text,
-                metadata=metadata
-            )
+            # Add memory using the correct mem0 API (add_memories)
+            # https://docs.mem0.ai/api-reference/memory/add-memories
+            memory = {
+                "embedding": embedding,
+                "text": text,
+                "metadata": metadata
+            }
+            
+            await self.client.add_memories([memory])
             
             logger.info(f"Indexed memory for user {username}: {text[:50]}...")
             return True
@@ -68,27 +80,43 @@ class Mem0Client:
             # Get embedding for the query text
             query_embedding = await embed_text(query_text)
             
-            # Query mem0 with username filter to ensure isolation
-            results = await self.client.query(
-                embedding=query_embedding,
-                filter={"username": username},
-                top_k=top_k
-            )
+            # Use search_memories v2 API
+            # https://docs.mem0.ai/api-reference/memory/v2-search-memories
+            search_params = {
+                "query_embedding": query_embedding,
+                "filter": {"metadata": {"username": username}},
+                "limit": top_k,
+                "include_metadata": True
+            }
+            
+            results = await self.client.search_memories_v2(**search_params)
             
             # Format the results
             memories = []
-            for result in results:
-                memory = {
-                    "text": result.text,
-                    "metadata": result.metadata,
-                    "score": result.score,
-                }
-                memories.append(memory)
+            if hasattr(results, 'memories'):
+                for memory in results.memories:
+                    mem_dict = {
+                        "text": memory.text,
+                        "metadata": memory.metadata,
+                        "score": memory.score if hasattr(memory, 'score') else 0.0,
+                        "id": memory.id if hasattr(memory, 'id') else None
+                    }
+                    memories.append(mem_dict)
+            else:
+                # Fallback for different return format
+                for memory in results:
+                    mem_dict = {
+                        "text": memory.text if hasattr(memory, 'text') else "",
+                        "metadata": memory.metadata if hasattr(memory, 'metadata') else {},
+                        "score": memory.score if hasattr(memory, 'score') else 0.0,
+                        "id": memory.id if hasattr(memory, 'id') else None
+                    }
+                    memories.append(mem_dict)
                 
             logger.info(f"Retrieved {len(memories)} memories for user {username}")
             return memories
         except Exception as e:
-            logger.error(f"Failed to query memories: {e}")
+            logger.error(f"Failed to query memories: {e}", exc_info=True)
             return []
             
     async def delete_memories(self, username: str) -> bool:
@@ -102,8 +130,9 @@ class Mem0Client:
             bool: True if deletion was successful
         """
         try:
-            # Delete memories with the username filter
-            await self.client.delete(filter={"username": username})
+            # Use the delete_memories API
+            # https://docs.mem0.ai/api-reference/memory/delete-memories
+            await self.client.delete_memories(filter={"metadata": {"username": username}})
             logger.info(f"Deleted all memories for user {username}")
             return True
         except Exception as e:
