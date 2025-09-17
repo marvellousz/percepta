@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+python-dotenv
+livekit             
+livekit-api          
+mem0ai               
+google-genai         
+aiohttp
