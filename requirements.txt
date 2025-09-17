@@ -1,8 +1,10 @@
 fastapi
 uvicorn
 python-dotenv
-livekit             
-livekit-api          
-mem0ai               
-google-genai         
+pydantic[dotenv]
+livekit              # client SDK (participant)
+livekit-api          # server SDK (token generation)
+mem0ai               # mem0 python SDK
+google-genai         # Google Gen AI (Gemini) python SDK
 aiohttp
+python-jose[cryptography]  # for JWT tokens
