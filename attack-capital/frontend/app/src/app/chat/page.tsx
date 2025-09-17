@@ -23,11 +23,12 @@ export default function ChatPage() {
   const [roomName, setRoomName] = useState("");
   const [websocket, setWebsocket] = useState<WebSocket | null>(null);
   const [currentAgent, setCurrentAgent] = useState(() => {
-    // Try to get the saved agent from localStorage, or default to support-agent
+    // Always use general-assistant as default and clear any stored agent
     if (typeof window !== 'undefined') {
-      return localStorage.getItem("selected_agent") || "support-agent";
+      localStorage.removeItem("selected_agent");
+      return "general-assistant";
     }
-    return "support-agent";
+    return "general-assistant";
   });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -175,7 +176,7 @@ export default function ChatPage() {
       ...prev,
       {
         id: Date.now().toString(),
-        content: `Switching to ${agentName.replace("-agent", "")} agent...`,
+        content: `Switching to ${agentName} agent...`,
         sender: "system",
         timestamp: new Date(),
       },

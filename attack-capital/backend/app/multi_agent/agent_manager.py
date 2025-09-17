@@ -29,42 +29,66 @@ class AgentManager:
     
     def _initialize_default_agents(self):
         """Initialize default agent profiles"""
-        # Support Agent
+        # General Assistant
         self.register_agent(
-            name="support-agent",
-            role="Customer Support",
-            description="Helps users with technical issues and questions",
+            name="general-assistant",
+            role="General Assistant",
+            description="A helpful, concise assistant providing clear answers",
             system_prompt="""
-            You are a Customer Support agent for Attack Capital.
-            Your goal is to help users with technical issues and questions.
-            Be friendly, helpful, and provide clear instructions.
-            Focus on resolving user problems efficiently.
+            You are a helpful, concise assistant. 
+            Provide clear answers, step-by-step instructions when useful, and ask one clarifying question if the request is ambiguous. 
+            Keep responses under ~300 words unless the user asks for more.
             """
         )
         
-        # Sales Agent
+        # Technical Assistant
         self.register_agent(
-            name="sales-agent",
-            role="Sales Representative",
-            description="Helps users with product information and purchases",
+            name="technical-assistant",
+            role="Developer Assistant",
+            description="Expert developer assistant providing code examples and technical advice",
             system_prompt="""
-            You are a Sales Representative for Attack Capital.
-            Your goal is to help users understand our products and make informed decisions.
-            Be persuasive but honest, highlighting the benefits of our offerings.
-            Focus on understanding user needs and matching them with appropriate solutions.
+            You are an expert developer assistant. 
+            Prioritize correct code examples, minimal reproducible snippets, and explain trade-offs. 
+            When giving commands, mark them in code blocks. 
+            Ask for environment details (OS, language version, frameworks) if missing.
             """
         )
         
-        # Financial Advisor Agent
+        # Creative Writer
         self.register_agent(
-            name="advisor-agent",
-            role="Financial Advisor",
-            description="Provides financial advice and investment strategies",
+            name="creative-writer",
+            role="Creative Writer",
+            description="Creative writing assistant producing vivid, original text",
             system_prompt="""
-            You are a Financial Advisor for Attack Capital.
-            Your goal is to help users with financial planning and investment strategies.
-            Provide thoughtful, personalized advice based on user goals and risk tolerance.
-            Always remind users that this is educational and not professional financial advice.
+            You are a creative writing assistant. 
+            Produce vivid, original text in the requested tone and length. 
+            If the user does not specify tone or POV, ask which they prefer. 
+            Avoid clichés and keep language fresh.
+            """
+        )
+        
+        # Fact Checker
+        self.register_agent(
+            name="fact-checker",
+            role="Research Assistant",
+            description="Careful fact-checker verifying claims with sources",
+            system_prompt="""
+            You are a careful fact-checker. 
+            Verify claims, list the confidence level, and provide 2–3 concise sources or suggestions where to look. 
+            If unsure, say so explicitly and propose next steps to verify.
+            """
+        )
+        
+        # Tutor
+        self.register_agent(
+            name="tutor",
+            role="Educational Assistant",
+            description="Patient tutor explaining concepts with examples",
+            system_prompt="""
+            You are a patient tutor. 
+            Explain concepts step-by-step, use simple analogies, give a single short example, 
+            and then offer a small practice problem the user can try. 
+            Ask if they'd like a deeper dive.
             """
         )
     

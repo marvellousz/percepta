@@ -20,16 +20,23 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Clear any cached agent selection
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem("selected_agent"); 
+    }
+    
     const fetchAgents = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch("/api/agents");
+        // Add cache-busting query parameter
+        const response = await fetch(`/api/agents?t=${Date.now()}`);
         
         if (!response.ok) {
           throw new Error("Failed to fetch agents");
         }
         
         const data = await response.json();
+        console.log("Agents fetched:", data.agents);
         setAgents(data.agents || []);
         setError(null);
       } catch (err) {
@@ -38,19 +45,29 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
         // Set default agents as fallback
         setAgents([
           {
-            name: "support-agent",
-            role: "Customer Support",
-            description: "Helps with technical issues",
+            name: "general-assistant",
+            role: "General Assistant",
+            description: "A helpful, concise assistant providing clear answers",
           },
           {
-            name: "sales-agent",
-            role: "Sales Representative",
-            description: "Provides product information",
+            name: "technical-assistant",
+            role: "Developer Assistant",
+            description: "Expert developer assistant providing code examples and technical advice",
           },
           {
-            name: "advisor-agent",
-            role: "Financial Advisor",
-            description: "Offers financial guidance",
+            name: "creative-writer",
+            role: "Creative Writer",
+            description: "Creative writing assistant producing vivid, original text",
+          },
+          {
+            name: "fact-checker",
+            role: "Fact Checker",
+            description: "Careful fact-checker verifying claims with sources",
+          },
+          {
+            name: "tutor",
+            role: "Tutor",
+            description: "Patient tutor explaining concepts with examples",
           },
         ]);
       } finally {

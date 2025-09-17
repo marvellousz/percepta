@@ -97,7 +97,7 @@ class RoomRequest(BaseModel):
 class MessageRequest(BaseModel):
     username: str
     message: str
-    agent: str = "support-agent"
+    agent: str = "general-assistant"
     
 class HandoffRequest(BaseModel):
     username: str
@@ -107,23 +107,35 @@ class HandoffRequest(BaseModel):
 
 # Agent profiles
 AGENTS = {
-    "support-agent": {
-        "name": "Support Agent",
-        "role": "Customer Support",
-        "description": "Helps users with technical issues and questions",
-        "prompt": "You are a Customer Support agent for Attack Capital. Your goal is to help users with technical issues and questions. Be friendly, helpful, and provide clear instructions."
+    "general-assistant": {
+        "name": "General Assistant",
+        "role": "General Assistant",
+        "description": "A helpful, concise assistant providing clear answers",
+        "prompt": "You are a helpful, concise assistant. Provide clear answers, step-by-step instructions when useful, and ask one clarifying question if the request is ambiguous. Keep responses under ~300 words unless the user asks for more."
     },
-    "sales-agent": {
-        "name": "Sales Agent",
-        "role": "Sales Representative",
-        "description": "Helps users with product information and purchases",
-        "prompt": "You are a Sales Representative for Attack Capital. Your goal is to help users understand our products and make informed decisions. Be persuasive but honest, highlighting the benefits of our offerings."
+    "technical-assistant": {
+        "name": "Technical Assistant",
+        "role": "Developer Assistant",
+        "description": "Expert developer assistant providing code examples and technical advice",
+        "prompt": "You are an expert developer assistant. Prioritize correct code examples, minimal reproducible snippets, and explain trade-offs. When giving commands, mark them in code blocks. Ask for environment details (OS, language version, frameworks) if missing."
     },
-    "advisor-agent": {
-        "name": "Financial Advisor",
-        "role": "Financial Advisor",
-        "description": "Provides financial advice and investment strategies",
-        "prompt": "You are a Financial Advisor for Attack Capital. Your goal is to help users with financial planning and investment strategies. Provide thoughtful, personalized advice based on user goals and risk tolerance."
+    "creative-writer": {
+        "name": "Creative Writer",
+        "role": "Creative Writer",
+        "description": "Creative writing assistant producing vivid, original text",
+        "prompt": "You are a creative writing assistant. Produce vivid, original text in the requested tone and length. If the user does not specify tone or POV, ask which they prefer. Avoid clichés and keep language fresh."
+    },
+    "fact-checker": {
+        "name": "Fact Checker",
+        "role": "Research Assistant",
+        "description": "Careful fact-checker verifying claims with sources",
+        "prompt": "You are a careful fact-checker. Verify claims, list the confidence level, and provide 2–3 concise sources or suggestions where to look. If unsure, say so explicitly and propose next steps to verify."
+    },
+    "tutor": {
+        "name": "Tutor",
+        "role": "Educational Assistant",
+        "description": "Patient tutor explaining concepts with examples",
+        "prompt": "You are a patient tutor. Explain concepts step-by-step, use simple analogies, give a single short example, and then offer a small practice problem the user can try. Ask if they'd like a deeper dive."
     }
 }
 
@@ -299,10 +311,10 @@ def get_context_for_user(username: str, limit: int = 10) -> str:
         
         return context
 
-async def generate_response(message: str, username: str, agent_name: str = "support-agent", context: Optional[str] = None) -> str:
+async def generate_response(message: str, username: str, agent_name: str = "general-assistant", context: Optional[str] = None) -> str:
     try:
         # Get agent profile
-        agent = AGENTS.get(agent_name, AGENTS["support-agent"])
+        agent = AGENTS.get(agent_name, AGENTS["general-assistant"])
         
         # Create the system message with agent profile
         system_prompt = agent['prompt']
@@ -438,7 +450,7 @@ async def handoff_conversation(request: HandoffRequest):
         to_agent = request.to_agent
         
         # Get agent profile
-        agent = AGENTS.get(to_agent, AGENTS["support-agent"])
+        agent = AGENTS.get(to_agent, AGENTS["general-assistant"])
         logger.info(f"Agent found: {agent}")
         
         # Generate simple handoff message
@@ -495,7 +507,7 @@ async def websocket_endpoint(websocket: WebSocket, username: str, room_name: str
         while True:
             data = await websocket.receive_json()
             message = data.get("message", "")
-            agent_name = data.get("agent", "support-agent")
+            agent_name = data.get("agent", "general-assistant")
             
             # Store the message in memory
             add_message(username, message, True)
