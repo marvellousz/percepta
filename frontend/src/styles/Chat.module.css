@@ -1,0 +1,157 @@
+/* frontend/src/styles/Chat.module.css */
+
+.chatContainer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  background-color: #fff;
+  overflow: hidden;
+}
+
+.header {
+  padding: 16px;
+  background-color: #f0f4f8;
+  border-bottom: 1px solid #e1e4e8;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #24292e;
+}
+
+.status {
+  font-size: 0.9rem;
+}
+
+.connected {
+  color: #28a745;
+}
+
+.disconnected {
+  color: #d73a49;
+}
+
+.messagesContainer {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.emptyState {
+  text-align: center;
+  color: #6a737d;
+  margin: auto 0;
+  padding: 24px;
+}
+
+.message {
+  padding: 12px;
+  border-radius: 8px;
+  max-width: 80%;
+  word-break: break-word;
+}
+
+.ownMessage {
+  align-self: flex-end;
+  background-color: #0366d6;
+  color: white;
+}
+
+.otherMessage {
+  align-self: flex-start;
+  background-color: #f6f8fa;
+  color: #24292e;
+}
+
+.agentMessage {
+  align-self: flex-start;
+  background-color: #6f42c1;
+  color: white;
+}
+
+.messageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+  font-size: 0.8rem;
+}
+
+.sender {
+  font-weight: bold;
+}
+
+.timestamp {
+  opacity: 0.8;
+}
+
+.messageText {
+  line-height: 1.4;
+}
+
+.inputForm {
+  display: flex;
+  padding: 16px;
+  border-top: 1px solid #e1e4e8;
+  gap: 8px;
+}
+
+.input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid #e1e4e8;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.input:focus {
+  outline: none;
+  border-color: #0366d6;
+}
+
+.sendButton {
+  padding: 10px 16px;
+  background-color: #0366d6;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.sendButton:hover:not(:disabled) {
+  background-color: #0255b3;
+}
+
+.sendButton:disabled {
+  background-color: #c0c0c0;
+  cursor: not-allowed;
+}
+
+.loading, .error {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  font-size: 1.2rem;
+}
+
+.loading {
+  color: #0366d6;
+}
+
+.error {
+  color: #d73a49;
+}
