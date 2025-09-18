@@ -1,4 +1,4 @@
-# Perceptra
+# perceptra
 
 A full-stack AI chat platform with FastAPI backend and Next.js frontend, featuring LiveKit integration and multi-agent AI capabilities.
 
