@@ -1,4 +1,4 @@
-# Percepta
+# percepta
 
 A real-time AI chat platform with multi-agent personalities, persistent memory, and WebSocket communication. Chat with different AI assistants that remember your conversations.
 
